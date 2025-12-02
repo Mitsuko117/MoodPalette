@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoodPalette</title>
+
+    <style> 
+    /* デザインの設定 */
+        body{
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #fffaef;
+        }
+
+        h1{
+            font-size: 20px;
+            text-align: center;
+            margin:16px 20px;
+        }
+
+        .calendar{
+            /* カレンダーの「マス」を並べる箱 */
+            display: grid;
+            grid-template-columns: repeat(7,1fr); /*7列（曜日分）にする*/
+            gap: 5px; /*マス同士の隙間*/
+            max-width: 400px; /*幅の上限*/
+            margin: 0 auto 20px auto;  /* 上はh1で余白をとるので、下だけ20px */
+            padding:0 8px;  /* 画面端にくっつきすぎないよう左右に少し余白 */
+        }
+
+        .day{
+            /* 1日分のマスの見た目 */
+            border:1px solid #ccc;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            min-height:50px;
+            font-size:12px;
+            box-sizing:border-box;/* 枠線・余白を含めてサイズ計算 */
+        }
+
+        .day.has-data{
+            background-color: #dff7d0;
+        }
+
+        /* ポップアップの背景 */
+        .modal-backdrop{
+            position:fixed;
+            inset: 0; /* 画面全体を覆う */
+            background: rgba(0,0,0,0.4); /* 半透明の黒 */
+            display: none;  /* 最初は非表示、JSから display:flex にする */
+            align-items: center;  /* 中身を上下中央に */
+            justify-content: center; /* 左右中央に */
+            z-index:1000; /* ほかの要素より前に出す */
+        }
+
+
+          /* ポップアップ本体 */
+        .modal{
+            background: white;
+            padding: 16px;
+            border-radius:4px;
+            width:206px;/* PC・タブレットのときの基本幅 */
+            max-width: 90vw;/* 画面幅よりはみ出さないようにする */
+            box-sizing: border-box;  /*https://zero-plus.io/media/box-sizing/*/
+        }
+
+        .modal h3{
+            margin-top:0;
+            font-size: 14px;
+        }
+
+        .modal label{
+            font-size: 12px;
+        }
+
+        .modal button{
+            font-size: 12px;
+        }
+
+        .mood-tabs{
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            justify-content: center;
+        }
+
+        .mood-tab{
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: #fff;
+            cursor: pointer;
+            font-size: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mood-tab:hover{
+            transform:scale(1.1);
+            transition: transform 0.1s;
+        }
+
+        .mood-tab-img{
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+        display:block;
+}
+        .mood-tab.selected{
+            transform: scale(1.5);
+        }
+
+        .mood-tab.selected{
+            border: 1.5px solid #c1ff72;
+            background: #fff;
+        }
+    /* レスポンシブ対応 */
+        @media(max-width:480px){
+            h1{
+                font-size: 18px;
+                margin: 12px 0;
+            }
+            
+            .calendar{
+                max-width: 100%;
+                padding: 0 4px;
+            }
+
+            .day{
+                min-height: 40px;
+                padding: 6px;
+                font-size: 10px;
+            }
+
+            .modal{
+                width: 90%;
+                padding: 12px;
+            }
+
+            .modal h3{
+                font-size: 13px;
+            }
+
+            .modal label,
+            .modal button{
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">MoodPalette</h1>
+    <div id="month-label" style="text-align: center; margin-bottom: 8px; font-weight: bold;"></div>
+
+    <!-- <div id="calendar-header" style="text-align:center; margin-bottom: 8px;">
+    <button id="prev-month">&lt;</button> 
+    <span id="month-label"></span> 
+    <button id="next-month">&gt;</button> -->
+</div>
+
+<!-- カレンダー本体を入れる箱（JavaScriptで中身を作る） -->
+    <div id="calendar" class="calendar"></div>
+
+<!-- ここからポップアップ（モーダル）のHTML） -->
+<div id="modalbackdrop" class="modal-backdrop">
+<div class="modal">
+    <!-- どの日付を編集しているかを表示するところ -->
+    <h3 id="modaldatatext"></h3>
+
+    <!-- 気分タブ（アイコンボタン） -->
+    <div class="mood-tabs">
+        <button type="button" class="mood-tab" data-score="1"><img src="./img/1.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="2"><img src="./img/2.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="3"><img src="./img/3.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="4"><img src="./img/4.png" alt="" class="mood-tab-img"></button>
+        <button type="button" class="mood-tab" data-score="5"><img src="./img/5.png" alt="" class="mood-tab-img"></button>
+    </div>
+
+    <!-- 選ばれたスコアを格納しておく隠し入力 -->
+    <input type="hidden" id="moodscore">
+
+    <br><br>
+    <!-- メモの入力欄（複数行のテキスト） -->
+    <label>
+    memo<br>
+    <textarea id="moodnote" rows="5" style="width: 100%;"></textarea>
+    </label>
+
+    <br><br>
+
+    <!-- 保存ボタンと閉じるボタン -->
+    <button id="savemoodbtn">保存</button>
+    <button id ="deletemoodbtn">削除</button>
+    <button id="closemoodbtn">閉じる</button>
+</div>
+</div>
+
+<!-- ここで jQuery を読み込む -->
+<script src="jquery-2.1.3.min.js"></script>
+<!-- そのあとに自分のコード -->
+<script src="app.js"></script>
+
+</body>
+</html>
